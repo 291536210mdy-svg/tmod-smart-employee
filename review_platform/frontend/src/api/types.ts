@@ -6,6 +6,10 @@ export type User = {
   enabled: boolean;
 };
 
+export type AdminUser = User & {
+  created_at: string;
+};
+
 export type AuthSession = {
   access_token: string;
   token_type: string;
@@ -49,6 +53,9 @@ export type Run = {
   error_message: string;
   summary: Record<string, unknown>;
   cancel_requested: boolean;
+  archived: boolean;
+  archived_at: string | null;
+  deleted_at: string | null;
 };
 
 export type RunEvent = {

@@ -8,6 +8,8 @@ import type {
   QaReport,
   Run,
   RunEvent,
+  AdminUser,
+  Role,
   User
 } from "./types";
 
@@ -87,12 +89,38 @@ export async function getMe(): Promise<User> {
   return apiFetch<User>("/api/auth/me");
 }
 
+export async function listUsers(): Promise<AdminUser[]> {
+  return apiFetch<AdminUser[]>("/api/auth/users");
+}
+
+export async function createUser(params: { username: string; password: string; role: Role }): Promise<User> {
+  return apiFetch<User>("/api/auth/users", {
+    method: "POST",
+    body: JSON.stringify(params)
+  });
+}
+
+export async function updateUser(
+  username: string,
+  params: { password?: string; role?: Role; enabled?: boolean }
+): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/api/auth/users/${encodeURIComponent(username)}`, {
+    method: "PATCH",
+    body: JSON.stringify(params)
+  });
+}
+
 export async function getBusinessLines(): Promise<BusinessLine[]> {
   return apiFetch<BusinessLine[]>("/api/business-lines");
 }
 
-export async function listRuns(): Promise<Run[]> {
-  return apiFetch<Run[]>("/api/runs");
+export async function listRuns(params: { includeArchived?: boolean } = {}): Promise<Run[]> {
+  const search = new URLSearchParams();
+  if (params.includeArchived) {
+    search.set("include_archived", "true");
+  }
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  return apiFetch<Run[]>(`/api/runs${suffix}`);
 }
 
 export async function getRun(runId: string): Promise<Run> {
@@ -101,6 +129,26 @@ export async function getRun(runId: string): Promise<Run> {
 
 export async function cancelRun(runId: string): Promise<Run> {
   return apiFetch<Run>(`/api/runs/${runId}/cancel`, { method: "POST" });
+}
+
+export async function archiveRun(runId: string): Promise<Run> {
+  return apiFetch<Run>(`/api/runs/${runId}/archive`, { method: "POST" });
+}
+
+export async function unarchiveRun(runId: string): Promise<Run> {
+  return apiFetch<Run>(`/api/runs/${runId}/unarchive`, { method: "POST" });
+}
+
+export async function deleteRun(runId: string): Promise<{ run_id: string; deleted: boolean; files_deleted: boolean }> {
+  return apiFetch<{ run_id: string; deleted: boolean; files_deleted: boolean }>(`/api/runs/${runId}`, { method: "DELETE" });
+}
+
+export async function cleanupRetention(dryRun = true): Promise<{
+  dry_run: boolean;
+  archived_count: number;
+  candidate_run_ids: string[];
+}> {
+  return apiFetch(`/api/runs/retention/cleanup?dry_run=${dryRun ? "true" : "false"}`, { method: "POST" });
 }
 
 export async function createAwardReviewRun(params: {

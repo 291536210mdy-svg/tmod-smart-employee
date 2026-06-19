@@ -1026,14 +1026,22 @@ def build_ranking_reason(entry):
         elif reason:
             weak_or_missing.append(label)
 
+    points = ranking_reason_evidence_points(entry, 2)
+    score_for_reason = entry.get("normal_review_score", entry.get("internal_score", 0)) or 0
+    if not dimensions and points and entry.get("workflow_status") == "dry_run":
+        score_sentence = "当前为预览模式，未调用评审模型计算综合匹配度。"
+    elif not dimensions and points and score_for_reason <= 0:
+        score_sentence = "综合匹配度暂未形成有效评分。"
+    else:
+        score_sentence = f"综合匹配度{match_level(score_for_reason)}。"
+
     parts = [
-        f"本奖项排名第{entry.get('award_rank', '')}位。综合匹配度{match_level(entry.get('internal_score', 0))}。"
+        f"本奖项排名第{entry.get('award_rank', '')}位。{score_sentence}"
     ]
     if strong_or_medium:
         parts.append(f"主要支撑来自{('、').join(strong_or_medium[:3])}。")
-    else:
+    elif not points:
         parts.append("申报材料暂未形成足够的可评分证据。")
-    points = ranking_reason_evidence_points(entry, 2)
     if points:
         parts.append(ensure_sentence(f"关键证据包括{('、').join(points[:2])}"))
 

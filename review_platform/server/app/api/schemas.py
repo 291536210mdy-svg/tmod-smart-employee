@@ -26,6 +26,10 @@ class UserResponse(BaseModel):
     enabled: bool
 
 
+class UserAdminResponse(UserResponse):
+    created_at: dt.datetime
+
+
 class CreateUserRequest(BaseModel):
     username: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=6)
@@ -36,6 +40,12 @@ class CreateUserResponse(BaseModel):
     username: str
     role: str
     enabled: bool
+
+
+class UpdateUserRequest(BaseModel):
+    password: str | None = Field(default=None, min_length=6)
+    role: str | None = Field(default=None, pattern="^(viewer|reviewer|admin)$")
+    enabled: bool | None = None
 
 
 class BusinessLineResponse(BaseModel):
@@ -71,6 +81,21 @@ class RunResponse(BaseModel):
     error_message: str
     summary: dict[str, Any]
     cancel_requested: bool
+    archived: bool
+    archived_at: dt.datetime | None = None
+    deleted_at: dt.datetime | None = None
+
+
+class RunDeleteResponse(BaseModel):
+    run_id: str
+    deleted: bool
+    files_deleted: bool
+
+
+class RetentionCleanupResponse(BaseModel):
+    dry_run: bool
+    archived_count: int
+    candidate_run_ids: list[str]
 
 
 class RunEventResponse(BaseModel):

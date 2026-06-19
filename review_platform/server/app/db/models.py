@@ -51,6 +51,9 @@ class Run(Base):
     error_message: Mapped[str] = mapped_column(Text, default="")
     summary_json: Mapped[str] = mapped_column(Text, default="{}")
     cancel_requested: Mapped[bool] = mapped_column(Boolean, default=False)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    archived_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
 
 class RunEvent(Base):
@@ -114,4 +117,3 @@ class ManualAction(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     operator: Mapped[str] = mapped_column(String(120), default="")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
-

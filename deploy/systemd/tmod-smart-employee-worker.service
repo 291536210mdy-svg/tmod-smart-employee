@@ -1,0 +1,16 @@
+[Unit]
+Description=TMOD Smart Employee Celery Worker
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=tmod
+Group=tmod
+WorkingDirectory=/opt/tmod-smart-employee/review_platform/server
+EnvironmentFile=/etc/tmod-smart-employee/server.env
+ExecStart=/opt/tmod-smart-employee/.venv/bin/celery -A app.worker.celery_app.celery_app worker --loglevel=INFO --concurrency=2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

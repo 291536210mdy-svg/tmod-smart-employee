@@ -87,7 +87,16 @@ class RunManager:
             run.status = "queued"
             db.commit()
         self.event_bus.publish(run_id, "run:queued", line_id=self.get_run(run_id).line_id)
-        self._futures[run_id] = self.executor.submit(self._execute, run_id)
+        backend = self.settings.run_execution_backend.lower()
+        if backend == "thread":
+            self._futures[run_id] = self.executor.submit(self.execute, run_id)
+            return
+        if backend == "celery":
+            from app.worker.tasks import execute_run
+
+            execute_run.delay(run_id)
+            return
+        raise ValueError(f"unsupported run execution backend: {self.settings.run_execution_backend}")
 
     def cancel(self, run_id: str) -> None:
         with SessionLocal() as db:
@@ -107,7 +116,7 @@ class RunManager:
 
     def list_runs(self, limit: int = 100) -> list[Run]:
         with SessionLocal() as db:
-            stmt = select(Run).order_by(Run.created_at.desc()).limit(limit)
+            stmt = select(Run).where(Run.deleted_at.is_(None)).order_by(Run.created_at.desc()).limit(limit)
             rows = list(db.scalars(stmt))
             for row in rows:
                 db.expunge(row)
@@ -128,6 +137,9 @@ class RunManager:
             line_id=self.get_run(run_id).line_id,
             payload={"artifact_type": artifact.artifact_type, "name": artifact.name},
         )
+
+    def execute(self, run_id: str) -> None:
+        self._execute(run_id)
 
     def _execute(self, run_id: str) -> None:
         with SessionLocal() as db:

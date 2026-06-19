@@ -1,0 +1,16 @@
+[Unit]
+Description=TMOD Smart Employee API
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=tmod
+Group=tmod
+WorkingDirectory=/opt/tmod-smart-employee/review_platform/server
+EnvironmentFile=/etc/tmod-smart-employee/server.env
+ExecStart=/opt/tmod-smart-employee/.venv/bin/gunicorn app.main:app --worker-class uvicorn.workers.UvicornWorker --workers 2 --bind 127.0.0.1:8000 --timeout 3600
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,11 +1,9 @@
 import {
   ArrowUp,
   Bot,
-  CheckCircle2,
   FileSpreadsheet,
   Paperclip,
   RefreshCcw,
-  Settings2,
   X
 } from "lucide-react";
 import { FormEvent, useEffect, useRef, useState } from "react";
@@ -16,11 +14,7 @@ import type { AwardReviewConfig, Role, Run } from "../api/types";
 import { CURRENT_BUSINESS_LINE_ID, getBusinessLineAgentName } from "../businessLineDisplay";
 import { StatusBadge, isTerminalStatus } from "../components/StatusBadge";
 
-const awardOptions = [
-  "全球业务突破奖 Global Business Breakthrough Award",
-  "AI价值领航奖 AI Value Navigator Award",
-  "企业经营乘长奖 Corporate Transformational Growth Award"
-];
+const LAST_CREATED_RUN_ID_KEY = "review_platform_last_created_run_id";
 
 type ChatWorkspacePageProps = {
   role: Role;
@@ -30,16 +24,10 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [message, setMessage] = useState("");
-  const [selectedAward, setSelectedAward] = useState(awardOptions[0]);
   const [file, setFile] = useState<File | null>(null);
-  const [dryRun, setDryRun] = useState(true);
   const [enableLeadershipPriority, setEnableLeadershipPriority] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  const [limit, setLimit] = useState(0);
-  const [timeout, setTimeoutValue] = useState(120);
-  const [sleep, setSleep] = useState(0.2);
   const [runs, setRuns] = useState<Run[]>([]);
-  const [createdRunId, setCreatedRunId] = useState("");
+  const [createdRunId, setCreatedRunId] = useState(() => sessionStorage.getItem(LAST_CREATED_RUN_ID_KEY) ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const canCreate = role === "reviewer" || role === "admin";
@@ -58,7 +46,6 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
 
   useEffect(() => {
     function handleNewTask() {
-      setCreatedRunId("");
       setError("");
       window.setTimeout(() => messageInputRef.current?.focus(), 0);
     }
@@ -89,11 +76,11 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
     }
 
     const config: AwardReviewConfig = {
-      dry_run: dryRun,
-      award_filters: selectedAward ? [selectedAward] : [],
-      limit: Number(limit) || 0,
-      timeout: Number(timeout) || 120,
-      sleep: Number(sleep) || 0,
+      dry_run: false,
+      award_filters: [],
+      limit: 0,
+      timeout: 120,
+      sleep: 0.2,
       enable_leadership_priority: enableLeadershipPriority
     };
 
@@ -101,11 +88,12 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
     setError("");
     try {
       const response = await createAwardReviewRun({
-        title: message.trim() || `${shortAwardName(selectedAward)} - ${file.name}`,
+        title: message.trim() || `全奖项评优 - ${file.name}`,
         file,
         config
       });
       setCreatedRunId(response.run_id);
+      sessionStorage.setItem(LAST_CREATED_RUN_ID_KEY, response.run_id);
       setMessage("");
       await refreshRuns();
     } catch (err) {
@@ -128,10 +116,6 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
             </span>
             <div className="min-w-0">
               <div className="mb-3 text-lg font-bold">{agentName}</div>
-              <div className="mb-3 flex flex-wrap gap-2">
-                <StatusPill active label="评优就绪" />
-                <StatusPill active={dryRun} label={dryRun ? "dry-run 已开启" : "正式运行"} />
-              </div>
               <p className="max-w-[620px] text-[15px] font-semibold leading-7 text-[#2c2c2c]">
                 你好，我可以开始评优。源数据准备好后，交给下方输入框即可。
               </p>
@@ -141,8 +125,7 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
           {createdRun ? (
             <div className="mt-10 flex justify-end">
               <div className="max-w-[480px] rounded-[20px] border border-line bg-white px-4 py-3 shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="truncate text-sm font-bold">{createdRun.title}</span>
+                <div className="mb-2 flex justify-start">
                   <StatusBadge status={createdRun.status} />
                 </div>
                 <div className="text-sm leading-6 text-stone-600">
@@ -172,20 +155,12 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
             onChange={(event) => setMessage(event.target.value)}
           />
 
-          {showSettings ? (
-            <div className="mb-3 grid gap-3 border-t border-line pt-3 sm:grid-cols-3">
-              <CompactNumber label="limit" min={0} step={1} value={limit} onChange={setLimit} />
-              <CompactNumber label="timeout" min={1} step={1} value={timeout} onChange={setTimeoutValue} />
-              <CompactNumber label="sleep" min={0} step={0.1} value={sleep} onChange={setSleep} />
-            </div>
-          ) : null}
-
           {error ? <div className="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
 
           <div className="flex flex-wrap items-center gap-2">
             <input
               ref={fileInputRef}
-              accept=".xlsx,.xls"
+              accept=".xlsx"
               className="sr-only"
               type="file"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
@@ -200,27 +175,6 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
               <Paperclip className="h-5 w-5" aria-hidden="true" />
             </button>
             <FileChip file={file} onClear={() => setFile(null)} />
-
-            <label className="flex min-w-[220px] flex-1 items-center gap-2 rounded-full border border-line bg-[#f7f7f5] px-3 py-2 text-sm font-semibold text-stone-700">
-              <FileSpreadsheet className="h-4 w-4 shrink-0 text-teal" aria-hidden="true" />
-              <select
-                className="min-w-0 flex-1 bg-transparent outline-none"
-                disabled={!canCreate}
-                value={selectedAward}
-                onChange={(event) => setSelectedAward(event.target.value)}
-              >
-                {awardOptions.map((award) => (
-                  <option key={award} value={award}>
-                    {shortAwardName(award)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex h-10 items-center gap-2 rounded-full border border-line bg-[#f7f7f5] px-3 text-sm font-semibold text-stone-700">
-              <input className="h-4 w-4 accent-teal" checked={dryRun} disabled={!canCreate} onChange={(event) => setDryRun(event.target.checked)} type="checkbox" />
-              dry-run
-            </label>
             <label className="flex h-10 items-center gap-2 rounded-full border border-line bg-[#f7f7f5] px-3 text-sm font-semibold text-stone-700">
               <input
                 className="h-4 w-4 accent-teal"
@@ -231,15 +185,6 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
               />
               优先级
             </label>
-            <button
-              className="flex h-10 w-10 items-center justify-center rounded-full text-stone-500 hover:bg-stone-100 hover:text-ink"
-              disabled={!canCreate}
-              onClick={() => setShowSettings((value) => !value)}
-              title="参数"
-              type="button"
-            >
-              <Settings2 className="h-5 w-5" aria-hidden="true" />
-            </button>
             <button
               className="ml-auto flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-stone-500 shadow-sm hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-45"
               disabled={!canCreate || submitting || !file}
@@ -252,19 +197,6 @@ export function ChatWorkspacePage({ role }: ChatWorkspacePageProps) {
         </div>
       </form>
     </div>
-  );
-}
-
-function StatusPill({ active, label }: { active: boolean; label: string }) {
-  return (
-    <span
-      className={`inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold ${
-        active ? "bg-[#dff8ed] text-teal" : "bg-stone-100 text-stone-500"
-      }`}
-    >
-      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-      {label}
-    </span>
   );
 }
 
@@ -281,36 +213,4 @@ function FileChip({ file, onClear }: { file: File | null; onClear: () => void })
       </button>
     </span>
   );
-}
-
-function CompactNumber({
-  label,
-  value,
-  min,
-  step,
-  onChange
-}: {
-  label: string;
-  value: number;
-  min: number;
-  step: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-stone-500">{label}</span>
-      <input
-        className="h-9 w-full rounded border border-line bg-white px-3 text-sm"
-        min={min}
-        step={step}
-        type="number"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function shortAwardName(award: string): string {
-  return award.split(" Award")[0].replace(/\s+[A-Z].*$/, "").trim() || award;
 }

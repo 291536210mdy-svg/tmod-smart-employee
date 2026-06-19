@@ -5,7 +5,6 @@ import {
   FileJson,
   FileText,
   RefreshCcw,
-  ShieldCheck,
   Table2,
   X
 } from "lucide-react";
@@ -19,15 +18,14 @@ import {
   getArtifacts,
   getCandidate,
   getCandidates,
-  getQaReport,
   getRun
 } from "../api/client";
-import type { Artifact, Candidate, CandidateDetail, QaReport, Role, Run, RunEvent } from "../api/types";
+import type { Artifact, Candidate, CandidateDetail, Role, Run, RunEvent } from "../api/types";
 import { EmptyState } from "../components/EmptyState";
 import { ProgressBar } from "../components/ProgressBar";
 import { isTerminalStatus, StatusBadge } from "../components/StatusBadge";
 import { useRunEvents } from "../hooks/useRunEvents";
-import { asBoolean, asNumber, formatBytes, formatDateTime, toArrayText } from "../utils/format";
+import { asNumber, formatBytes, formatDateTime } from "../utils/format";
 
 type RunDetailPageProps = {
   role: Role;
@@ -39,7 +37,6 @@ export function RunDetailPage({ role, token }: RunDetailPageProps) {
   const [run, setRun] = useState<Run | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [qaReport, setQaReport] = useState<QaReport | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -56,14 +53,12 @@ export function RunDetailPage({ role, token }: RunDetailPageProps) {
       const nextRun = await getRun(runId);
       setRun(nextRun);
       if (canInspect) {
-        const [nextArtifacts, nextCandidates, nextQa] = await Promise.all([
+        const [nextArtifacts, nextCandidates] = await Promise.all([
           getArtifacts(runId).catch(() => []),
-          getCandidates(runId).catch(() => []),
-          getQaReport(runId).catch(() => null)
+          getCandidates(runId).catch(() => [])
         ]);
         setArtifacts(nextArtifacts);
         setCandidates(nextCandidates);
-        setQaReport(nextQa);
       }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "运行详情加载失败");
@@ -193,7 +188,6 @@ export function RunDetailPage({ role, token }: RunDetailPageProps) {
               {run.cancel_requested ? <span className="rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">已请求取消</span> : null}
             </div>
             <h1 className="break-words text-xl font-bold">{run.title || run.run_id}</h1>
-            <p className="mt-1 break-all text-xs text-stone-500">{run.run_id}</p>
           </div>
           <div className="min-w-60">
             <ProgressBar current={latestProgress?.progress.current} total={latestProgress?.progress.total} />
@@ -210,26 +204,14 @@ export function RunDetailPage({ role, token }: RunDetailPageProps) {
           <div className="m-4 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error || actionError || eventError}</div>
         ) : null}
 
-        <div className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryMetric label="奖项" value={toArrayText(run.config.award_filters)} />
-          <SummaryMetric label="处理候选" value={String(run.summary.processed_rows ?? run.summary.candidate_results ?? "-")} />
-          <SummaryMetric label="QA" value={qaLabel(run.summary.qa_passed, qaReport)} />
+        <div className="grid gap-4 border-t border-line p-4 sm:grid-cols-2">
           <SummaryMetric label="创建时间" value={formatDateTime(run.created_at)} />
-        </div>
-
-        <div className="grid gap-4 border-t border-line p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryMetric label="dry-run" value={String(run.config.dry_run ?? "-")} />
-          <SummaryMetric label="优先级" value={String(run.config.enable_leadership_priority ?? "-")} />
-          <SummaryMetric label="limit" value={String(run.config.limit ?? "-")} />
           <SummaryMetric label="完成时间" value={formatDateTime(run.finished_at)} />
         </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="space-y-6">
-          <QaPanel qaReport={qaReport} canInspect={canInspect} />
-          <CandidatesPanel canInspect={canInspect} candidates={candidates} loadingDetail={loadingDetail} onOpen={openCandidate} />
-        </div>
+        <CandidatesPanel canInspect={canInspect} candidates={candidates} loadingDetail={loadingDetail} onOpen={openCandidate} />
         <div className="space-y-6">
           <ArtifactsPanel artifacts={artifacts} canInspect={canInspect} onDownload={handleDownload} />
           <EventsPanel events={events} />
@@ -247,50 +229,6 @@ function SummaryMetric({ label, value }: { label: string; value: string }) {
       <div className="text-xs font-semibold text-stone-500">{label}</div>
       <div className="mt-1 break-words text-sm font-bold text-ink">{value}</div>
     </div>
-  );
-}
-
-function QaPanel({ qaReport, canInspect }: { qaReport: QaReport | null; canInspect: boolean }) {
-  if (!canInspect) {
-    return (
-      <section className="rounded border border-line bg-white p-4 shadow-soft">
-        <EmptyState icon={ShieldCheck} title="QA 结果不可见" body="viewer 可查看运行状态，reviewer 和 admin 可查看 QA 与结果明细。" />
-      </section>
-    );
-  }
-
-  const passed = asBoolean(qaReport?.passed);
-  const errors = Array.isArray(qaReport?.errors) ? qaReport.errors : [];
-  const warnings = Array.isArray(qaReport?.warnings) ? qaReport.warnings : [];
-
-  return (
-    <section className="rounded border border-line bg-white shadow-soft">
-      <div className="flex items-center justify-between border-b border-line px-4 py-4">
-        <div>
-          <h2 className="text-base font-bold">QA</h2>
-          <p className="text-sm text-stone-500">{qaReport ? (passed ? "通过" : "需复核") : "等待产物"}</p>
-        </div>
-        <ShieldCheck className={passed ? "h-5 w-5 text-emerald-600" : "h-5 w-5 text-stone-400"} aria-hidden="true" />
-      </div>
-      {qaReport ? (
-        <div className="grid gap-4 p-4 sm:grid-cols-3">
-          <SummaryMetric label="passed" value={String(passed ?? "-")} />
-          <SummaryMetric label="errors" value={String(errors.length)} />
-          <SummaryMetric label="warnings" value={String(warnings.length)} />
-        </div>
-      ) : (
-        <div className="p-4">
-          <EmptyState icon={ShieldCheck} title="暂无 QA 报告" body="任务完成后会展示 QA 汇总。" />
-        </div>
-      )}
-      {errors.length || warnings.length ? (
-        <div className="border-t border-line p-4">
-          <pre className="max-h-56 overflow-auto rounded bg-ink p-3 text-xs text-white scrollbar-thin">
-            {JSON.stringify({ errors, warnings }, null, 2)}
-          </pre>
-        </div>
-      ) : null}
-    </section>
   );
 }
 
@@ -469,16 +407,4 @@ function CandidateDrawer({ candidate, onClose }: { candidate: CandidateDetail; o
       </aside>
     </div>
   );
-}
-
-function qaLabel(summaryQa: unknown, qaReport: QaReport | null): string {
-  const reportPassed = asBoolean(qaReport?.passed);
-  if (reportPassed !== null) {
-    return reportPassed ? "通过" : "需复核";
-  }
-  const summaryPassed = asBoolean(summaryQa);
-  if (summaryPassed !== null) {
-    return summaryPassed ? "通过" : "需复核";
-  }
-  return "-";
 }

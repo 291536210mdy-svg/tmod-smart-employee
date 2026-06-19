@@ -3,7 +3,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_role
-from app.api.schemas import CreateUserRequest, CreateUserResponse, LoginRequest, TokenResponse, UserResponse
+from app.api.schemas import (
+    CreateUserRequest,
+    CreateUserResponse,
+    LoginRequest,
+    TokenResponse,
+    UpdateUserRequest,
+    UserAdminResponse,
+    UserResponse,
+)
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.base import get_db
 from app.db.models import User
@@ -46,3 +54,47 @@ def create_user(
     db.refresh(user)
     return CreateUserResponse(username=user.username, role=user.role, enabled=user.enabled)
 
+
+@router.get("/users", response_model=list[UserAdminResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+) -> list[UserAdminResponse]:
+    users = db.scalars(select(User).order_by(User.created_at.desc(), User.username)).all()
+    return [
+        UserAdminResponse(
+            username=user.username,
+            role=user.role,
+            enabled=user.enabled,
+            created_at=user.created_at,
+        )
+        for user in users
+    ]
+
+
+@router.patch("/users/{username}", response_model=UserAdminResponse)
+def update_user(
+    username: str,
+    payload: UpdateUserRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_role("admin")),
+) -> UserAdminResponse:
+    user = db.scalar(select(User).where(User.username == username))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="用户不存在")
+    if user.username == admin.username and payload.enabled is False:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能停用当前登录账号")
+    if payload.password:
+        user.password_hash = hash_password(payload.password)
+    if payload.role is not None:
+        user.role = payload.role
+    if payload.enabled is not None:
+        user.enabled = payload.enabled
+    db.commit()
+    db.refresh(user)
+    return UserAdminResponse(
+        username=user.username,
+        role=user.role,
+        enabled=user.enabled,
+        created_at=user.created_at,
+    )

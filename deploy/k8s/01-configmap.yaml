@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tmod-smart-employee-config
+  namespace: tmod-smart-employee
+data:
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8000"
+  DEBUG_RELOAD: "false"
+  APP_DATA_DIR: "/app/data"
+  PUBLIC_BASE_URL: "https://tmod.example.com"
+  CORS_ALLOW_ORIGINS: '["https://tmod.example.com"]'
+  UPLOAD_MAX_BYTES: "52428800"
+  UPLOAD_ALLOWED_EXTENSIONS: '[".xlsx"]'
+  RUN_MAX_WORKERS: "2"
+  RUN_EXECUTION_BACKEND: "celery"
+  RUN_RETENTION_DAYS: "180"
+  RUN_RETENTION_KEEP_LAST: "200"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+  ARTIFACT_STORAGE_BACKEND: "local"
+  S3_REGION_NAME: "us-east-1"
+  S3_PREFIX: "review-platform"
+  DIFY_USER: "review-platform"

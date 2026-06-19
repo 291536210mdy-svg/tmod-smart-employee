@@ -9,10 +9,9 @@ def main() -> None:
         "app.main:app",
         host=settings.app_host,
         port=settings.app_port,
-        reload=True,
+        reload=settings.debug_reload,
     )
 
 
 if __name__ == "__main__":
     main()
-

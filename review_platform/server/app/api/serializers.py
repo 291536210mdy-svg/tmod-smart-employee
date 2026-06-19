@@ -50,6 +50,9 @@ def run_to_response(run: Run) -> RunResponse:
         error_message=run.error_message,
         summary=_loads(run.summary_json, {}),
         cancel_requested=run.cancel_requested,
+        archived=run.archived,
+        archived_at=run.archived_at,
+        deleted_at=run.deleted_at,
     )
 
 
@@ -98,4 +101,3 @@ def candidate_to_response(candidate: CandidateResult) -> CandidateResponse:
 def candidate_to_detail_response(candidate: CandidateResult) -> CandidateDetailResponse:
     base = candidate_to_response(candidate).model_dump()
     return CandidateDetailResponse(**base, raw=_loads(candidate.raw_json, {}))
-

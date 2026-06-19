@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from urllib.parse import quote
 
 from app.api.deps import get_run_manager, require_role
 from app.api.schemas import ArtifactResponse
@@ -32,11 +33,15 @@ def download_artifact(
     db: Session = Depends(get_db),
     user: User = Depends(require_role("reviewer")),
     manager: RunManager = Depends(get_run_manager),
-) -> FileResponse:
+) -> Response:
     _ensure_run_exists(db, run_id)
     artifact = db.scalar(select(Artifact).where(Artifact.run_id == run_id, Artifact.artifact_id == artifact_id))
     if not artifact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
+    if manager.artifact_store.is_remote(artifact):
+        response = manager.artifact_store.open_remote_object(artifact)
+        headers = {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(artifact.name)}"}
+        return StreamingResponse(response["Body"].iter_chunks(), media_type=artifact.content_type, headers=headers)
     path = manager.artifact_store.resolve_path(artifact)
     if not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact file missing")
@@ -44,6 +49,5 @@ def download_artifact(
 
 
 def _ensure_run_exists(db: Session, run_id: str) -> None:
-    if not db.scalar(select(Run.id).where(Run.run_id == run_id)):
+    if not db.scalar(select(Run.id).where(Run.run_id == run_id, Run.deleted_at.is_(None))):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
-

@@ -6,6 +6,7 @@ import {
   MessageSquarePlus,
   MoreHorizontal,
   Search,
+  UsersRound,
   UserRound,
   X,
   type LucideIcon
@@ -104,6 +105,9 @@ export function Shell({ user, onLogout, onRefreshUser }: ShellProps) {
           <RailButton active={location.pathname === "/"} icon={MessageSquarePlus} label="新建评优" onClick={goHome} />
           <RailButton active={panel === "search"} icon={Search} label="搜索任务" onClick={() => openPanel("search")} />
           <RailButton active={panel === "profile"} icon={UserRound} label="账号" onClick={() => openPanel("profile")} />
+          {user.role === "admin" ? (
+            <RailButton active={location.pathname === "/admin/users"} icon={UsersRound} label="成员管理" onClick={() => goTo("/admin/users")} />
+          ) : null}
           <RailButton active={location.pathname === "/lines"} icon={FolderOpen} label="业务线" onClick={() => goTo("/lines")} />
           <RailButton active={location.pathname.startsWith("/runs")} icon={Clock3} label="运行记录" onClick={() => goTo("/runs")} />
           <RailButton active={panel === "more"} icon={MoreHorizontal} label="更多" onClick={() => openPanel("more")} />
@@ -185,6 +189,7 @@ export function Shell({ user, onLogout, onRefreshUser }: ShellProps) {
               <PanelAction icon={MessageSquarePlus} label="新建评优" onClick={goHome} />
               <PanelAction icon={Clock3} label="查看运行记录" onClick={() => goTo("/runs")} />
               <PanelAction icon={FolderOpen} label="查看业务线" onClick={() => goTo("/lines")} />
+              {user.role === "admin" ? <PanelAction icon={UsersRound} label="成员管理" onClick={() => goTo("/admin/users")} /> : null}
               <PanelAction icon={HelpCircle} label="帮助" onClick={() => setPanel(null)} />
             </div>
           ) : null}

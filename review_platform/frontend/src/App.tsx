@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { clearSession, getMe, getStoredRole, getStoredToken } from "./api/client";
 import type { User } from "./api/types";
 import { Shell } from "./components/Shell";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { ChatWorkspacePage } from "./pages/ChatWorkspacePage";
 import { LinesPage } from "./pages/LinesPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -76,8 +77,12 @@ export default function App() {
       <Route element={<Shell user={activeUser} onLogout={handleLogout} onRefreshUser={refreshUser} />}>
         <Route index element={<ChatWorkspacePage role={activeUser.role} />} />
         <Route path="/lines" element={<LinesPage />} />
-        <Route path="/runs" element={<RunsPage />} />
+        <Route path="/runs" element={<RunsPage role={activeUser.role} />} />
         <Route path="/runs/:runId" element={<RunDetailPage role={activeUser.role} token={token} />} />
+        <Route
+          path="/admin/users"
+          element={activeUser.role === "admin" ? <AdminUsersPage currentUsername={activeUser.username} /> : <Navigate to="/" replace />}
+        />
       </Route>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />

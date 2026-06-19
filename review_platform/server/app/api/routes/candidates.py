@@ -62,13 +62,12 @@ def get_qa_report(
     )
     if not artifact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="QA report not found")
-    path = manager.artifact_store.resolve_path(artifact)
-    if not path.exists():
+    try:
+        return json.loads(manager.artifact_store.read_text(artifact))
+    except FileNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="QA report file missing")
-    with path.open(encoding="utf-8") as file:
-        return json.load(file)
 
 
 def _ensure_run_exists(db: Session, run_id: str) -> None:
-    if not db.scalar(select(Run.id).where(Run.run_id == run_id)):
+    if not db.scalar(select(Run.id).where(Run.run_id == run_id, Run.deleted_at.is_(None))):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
